@@ -36,7 +36,7 @@ class API(OandaAPI):
         query = {
             "granularity": granularity,
             "from": start,
-            "to": end
+            "to": end,
         }
         content = self.get(CANDLESV3, query, instrument=instrument)
         data = json.loads(content)
@@ -183,6 +183,10 @@ class MongodbStorage(object):
     def get_collection(self, instrumet):
         return self.db[vt_symbol(instrumet)]
 
+    def count(self, instrumet, date):
+        col = self.get_collection(instrumet)
+        return col.find({"date": str(date)}).count()
+
     @staticmethod
     def append(collection, bar):
         try:
@@ -224,14 +228,33 @@ def date_range(start, end=None, tz=None):
 
 class Framework(object):
 
-    def __init__(self, api, storage, tz=0):
+    def __init__(self, api, storage):
         assert isinstance(api, API)
         assert isinstance(storage, MongodbStorage)
         self.api = api
         self.storage = storage
-        self.tz = timezone(timedelta(hours=tz)) 
+        self.tz = timezone(timedelta(hours=0)) 
+
+    def _create(self, instrument, date):
+        r = self.storage.create(instrument, date)
+        if r:
+            logging.debug("create log | %s | %s | %s", instrument, date, r)
+            return 1
+        else:
+            logging.warning("create log | %s | %s | duplicated", instrument, date)
+            return 0
 
     def create(self, instruments, start, end):
+        dates = date_range(start, end, self.tz)
+        count = 0
+        for i, d in product(instruments, dates):
+            count += self._create(i, int(d))
+        if count > 0:
+            logging.warning("create log | %s | %s-%s | %s", instruments, dates[0], dates[-1], count)
+        self.ensure(instruments)
+        self.check(instruments)
+
+    def update(self, instruments, start, end):
         for i in instruments:
             last = self.storage.get_last_date(i)
             if not last:
@@ -239,16 +262,21 @@ class Framework(object):
             dates = date_range(last, end, self.tz)
             count = 0
             for d in dates:
-                r = self.storage.create(i, int(d))
-                if r:
-                    logging.debug("create log | %s | %s | %s", i, d, r)
-                    count += 1
-                else:
-                    logging.warning("create log | %s | %s | duplicated", i, d)            
+                count += self._create(i, int(d))            
             if count > 0:
                 logging.warning("create log | %s | %s-%s | %s", i, dates[0], dates[-1], count)
-            self.storage.ensure_table(i)
-    
+
+    def _check(self, instrument, date):
+        count = self.storage.count(instrument, date)
+        if count > 0:
+            self.storage.fill(instrument, date, count, count)
+            logging.warning("check | %s | %s | %s", instrument, date, count)
+
+    def check(self, instruments):
+        missions = list(self.storage.find(instruments, None, None))
+        for i, d, s, e in missions:
+            self._check(i, d)
+
     def ensure(self, instruments):
         for i in instruments:
             self.storage.ensure_table(i)
@@ -260,7 +288,9 @@ class Framework(object):
         total = len(missions)
         accomplish = 0
         for i, d, s, e in missions:
-            if e.replace(tzinfo=self.tz) >= now:
+            s = s.replace(tzinfo=self.tz)
+            e = e.replace(tzinfo=self.tz)
+            if e >= now:
                 logging.warning("publish | %s | %s | end: %s is future", i, d, e)
                 accomplish += 1
                 continue
@@ -318,18 +348,18 @@ def command(filename="conf.yml", commands=None):
     api = API(**conf.get("oanda", {}))
     target = conf["target"]
     storage = MongodbStorage(**conf.get("mongodb", {}))
-    fw = Framework(api, storage, target.get("timezone", 0))
+    fw = Framework(api, storage)
     instruments = target["instruments"]
     
     if len(commands) == 0:
-        commands = ["publish"]
+        commands = ["create", "publish"]
     for cmd in commands:
-        if cmd == "create":
-            fw.create(instruments, target["start"], target.get("end", None))
+        if cmd == "update":
+            fw.update(instruments, target["start"], target.get("end", None))
         elif cmd == "publish":
             fw.publish(instruments, target["start"], target.get("end", None), False, target.get("redo", 3))
-        elif cmd == "ensure":
-            fw.ensure(instruments)
+        elif cmd == "create":
+            fw.create(instruments, target["start"], target.get("end", None))
     
 
 def main():
@@ -339,3 +369,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

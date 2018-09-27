@@ -3,16 +3,15 @@ import requests
 import pandas as pd
 import json
 from itertools import chain
-import logging
-import click
+# import utils.logger
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError
 from utils.mongodb import append, read, insert
 from itertools import product
 from utils.conf import load
+import logging
 
-logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
 URL = "https://api.binance.com/api/v1/klines"
 GAP = 60*12*60*1000
@@ -69,6 +68,7 @@ def get_hist_1min_content(**kwargs):
 
 # 获取分钟原始数据(json格式)
 def get_hist_1min_docs(**kwargs):
+    logging.debug("require bars | %s", kwargs)
     content = get_hist_1min_content(**kwargs)
     return json.loads(content)
 
@@ -174,8 +174,34 @@ class MongoDBStorage(object):
         self.db = self.client[db]
         log_db, log_col = log.split(".")
         self.log = self.client[log_db][log_col]
-    
+
+    def check(self):
+        for symbol, start, end in self.find():
+            self._check(symbol, start, end)
+
+    def count(self, symbol, start, end):
+        col = self.db[vt_symbol(symbol)]
+        return col.find({"datetime": {"$gte": start, "$lt": end}}).count()
+
+    def _check(self, symbol, start, end):
+        count = self.count(symbol, start, end)
+        if count > 0:
+            self.fill(symbol, start, end, count, count)
+            logging.warning("check | %s | %s | %s | %s", symbol, start, end, count)
+
     def create(self, symbols, start, end):
+        start, end = int2dt(start), int2dt(end)
+        create_index(self.log, symbols, start, end)
+        for symbol in symbols:
+            self.ensure(symbol)
+        self.check()
+    
+    def ensure(self, symbol):
+        col = self.db[vt_symbol(symbol)]
+        col.create_index("datetime", unique=True, background=True)
+        col.create_index("date", background=True)
+    
+    def update(self, symbols, start, end):
         start, end = int2dt(start), int2dt(end)
         for symbol in symbols:
             last = self.latest(symbol)
@@ -204,10 +230,10 @@ class MongoDBStorage(object):
             if end > now:
                 logging.warning("handle require | %s | %s | %s | end > now(%s)", symbol, start, end, now)
                 continue
-            r = self.handle(symbol, start, end)
-            if r:
-                logging.warning("handle require | %s | %s | %s | %s", symbol, start, end, r)
+            i, c = self.handle(symbol, start, end)
+            if i:
                 count += 1
+            logging.warning("handle require | %s | %s | %s | %s | %s", symbol, start, end, c, i)
         if retry:
             if count < total:
                 self.publish(retry-1)
@@ -218,7 +244,7 @@ class MongoDBStorage(object):
             frame = get_hist_1min(symbol, "1m", dt2mts(start), dt2mts(end), limit=LIMIT)
         except Exception as e:
             logging.error("query data | %s | %s | %s | %s", symbol, start, end, e)
-            return 
+            return 0, 0
         count = len(frame.index)
         if count:
             frame = vnpy_format(frame, symbol, vtSymbol)
@@ -232,7 +258,7 @@ class MongoDBStorage(object):
             inserted = 0
             count = -1
         self.fill(symbol, start, end, count, inserted)
-        return inserted
+        return inserted, count
 
     def fill(self, symbol, start, end, count, fill):
         flt = {"symbol": symbol, "start": start, "end": end} 
@@ -274,13 +300,16 @@ def history(filename="conf.yml", commands=None):
     storage = MongoDBStorage(**CONF["mongodb"])
     if not commands:
         commands = ["create", "publish"]
+    logging.warning("commands: %s", commands)
+    start = target["start"]
+    end = target.get("end", today())
     for command in commands:
-        if command == "create":
-            start = target["start"]
-            end = target.get("end", today())
-            storage.create(target["symbol"], start, end)
-        if command == "publish":
+        if command == "update":
+            storage.update(target["symbol"], start, end)
+        elif command == "publish":
             storage.publish(target["retry"])
+        elif command == "create":
+            storage.create(target["symbol"], start, end)
 
 
 def today():
@@ -353,7 +382,7 @@ class MongodbStreamBars(StreamBars):
                 logging.error("write bar | %s | %s | %s", self.symbol, doc, e)
 
 
-def update(filename):
+def stream(filename):
     init(filename)
     mongodb = CONF["mongodb"]
     client = MongoClient(mongodb["host"])
@@ -372,7 +401,8 @@ def update(filename):
 
 
 def main():
-    history(commands=["publish"])
+    import sys
+    history(commands=sys.argv[1:])
 
 
 if __name__ == '__main__':

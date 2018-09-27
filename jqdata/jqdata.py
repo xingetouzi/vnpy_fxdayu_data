@@ -80,6 +80,9 @@ class Writer(object):
 
     def create(self, symbols):
         pass
+    
+    def count(self, symbol, date):
+        pass
 
 
 def not_empty(item):
@@ -135,12 +138,26 @@ class FrameWork(object):
             return vnpy_format(data, symbol)
         else:
             raise ValueError(msg)
+    
+    def check(self):
+        for symbol, date in self.index.find(count=0):
+            count = self.writer.count(symbol, date)
+            if count > 0:
+                self.index.fill(symbol, date, count, count)
+                logging.warning("check | %s | %s | %s ", symbol, date, count)
 
     def publish(self):
         for symbol, date in self.index.find(count=0):
             self.handle(symbol, date)
 
     def create(self, symbols=None, start=None, end=None):
+        if not symbols:
+            symbols = self.symbols
+        for symbol, date in product(symbols, self.get_trade_days(start, end)):
+            self.index.create(symbol, date)
+        self.check()
+
+    def update(self, symbols=None, start=None, end=None):
         if not symbols:
             symbols = self.symbols
         for symbol in symbols:
@@ -297,6 +314,10 @@ class MongoDBWriter(Writer):
             else:
                 count += 1
         return count
+
+    def count(self, symbol, date):
+        col = self.get_collection(symbol)
+        return col.find({"date": str(date)}).count()
             
 
 def split(num, d=100, left=3):
@@ -337,10 +358,12 @@ def command(filename="conf.yml", commands=None):
         commands = ["create", "publish"]
     
     for cmd in commands:
-        if cmd == "create":
-            fw.create(start=CONF["data"]["start"], end=CONF["data"]["end"])
-        if cmd == "publish":
+        if cmd == "update":
+            fw.update(start=CONF["data"]["start"], end=CONF["data"]["end"])
+        elif cmd == "publish":
             fw.publish()
+        elif cmd == "create":
+            fw.create(start=CONF["data"]["start"], end=CONF["data"]["end"])
         
 
 def main():
