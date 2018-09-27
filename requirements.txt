@@ -1,0 +1,5 @@
+pandas>=0.19.1
+pymongo
+jaqs
+requests==2.11.1
+PyYAML==3.12
