@@ -1,0 +1,15 @@
+login:
+  addr: tcp://data.quantos.org:8910
+  username: ""
+  password: ""
+mongodb:
+  host: localhost:27017
+  db: VnTrader_1Min_Db
+data:
+  start: 20180101
+  symbols: 
+    - AP.CZC
+    - j.DCE
+    - cu.SHF
+
+  

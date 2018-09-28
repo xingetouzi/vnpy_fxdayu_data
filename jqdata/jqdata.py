@@ -297,8 +297,9 @@ class MongoDBWriter(Writer):
     
     def create(self, symbols):
         for symbol in symbols:
-            self.db[symbol].create_index("datetime", unique=True, background=True)
-            self.db[symbol].create_index("date", background=True)
+            col = self.get_collection(symbol)
+            col.create_index("datetime", unique=True, background=True)
+            col.create_index("date", background=True)
     
     def get_collection(self, symbol):
         return self.db[vt_symbol(symbol)]
