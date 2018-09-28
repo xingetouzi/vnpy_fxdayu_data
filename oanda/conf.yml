@@ -1,0 +1,13 @@
+oanda:
+  token: ""
+  trade_type: PRACTICE
+mongodb:
+  host: "localhost:27017"
+  db: "VnTrader_1Min_Db"
+  log: "log.oanda"
+target:
+  redo: 3
+  start: 20171001
+  instruments:
+    - HK33_HKD
+
