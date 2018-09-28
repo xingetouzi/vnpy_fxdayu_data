@@ -205,7 +205,6 @@ class MongodbStorage(object):
         bar["datetime"] = dt
         bar["date"] = dt.strftime("%Y%m%d")
         bar["time"] = dt.strftime("%H:%M:%S")
-        bar["rawData"] = None
         bar["openInterest"] = 0
         return bar
     
