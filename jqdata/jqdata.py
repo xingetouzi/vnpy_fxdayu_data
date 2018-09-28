@@ -25,15 +25,20 @@ CONF = {
     "mongodb": {
         "host": "localhost:27017",
         "db": "VnTrader_1Min_Db",
-        "log": "log.jqm1"
+        "log": "log.jqm1",
+        "latest": "VnTrader_1Min_Db_latest"
     },
-    "data": {
+    "history": {
         "start": 20180101,
         "end": get_today(),
         "symbols": []
     },
     "calendar": "calendar.csv"
 }
+
+
+def init(filename="conf.yml"):
+    load(filename, CONF)
 
 
 def get_api():
@@ -51,11 +56,19 @@ def get_mongodb_storage():
     writer = MongoDBWriter(client[mongodb["db"]])
     return jqindex, writer
 
+
+def get_mongodb_latest():
+    mongodb = CONF["mongodb"]
+    return MongoDBWriter(
+        MongoClient(mongodb["host"])[mongodb["latest"]]
+    )
+
+
 def get_framework():
-    data = CONF["data"]
+    history = CONF["history"]
     api = get_api()
     index, writer = get_mongodb_storage()
-    return FrameWork(api, index, writer, data["symbols"], CONF["calendar"])
+    return FrameWork(api, index, writer, history["symbols"], CONF["calendar"])
 
 
 class JQIndex(object):
@@ -83,6 +96,9 @@ class Writer(object):
     
     def count(self, symbol, date):
         pass
+    
+    def last(self, symbol):
+        pass
 
 
 def not_empty(item):
@@ -106,7 +122,6 @@ class FrameWork(object):
         self.writer = writer
         self.symbols = symbols
         self.calendar = self.create_calendar(calendar)
-        self.writer.create(symbols)
 
     def query(self, view, fields="", **filters):
         ft = "&".join(map(join, filter(not_empty, filters.items())))
@@ -147,7 +162,12 @@ class FrameWork(object):
                 logging.warning("check | %s | %s | %s ", symbol, date, count)
 
     def publish(self):
+        today = get_today()
         for symbol, date in self.index.find(count=0):
+            if date == today:
+                if datetime.now().hour < 17:
+                    logging.warning("publish | %s | %s | data not ready", symbol, date)
+                    continue
             self.handle(symbol, date)
 
     def create(self, symbols=None, start=None, end=None):
@@ -155,6 +175,7 @@ class FrameWork(object):
             symbols = self.symbols
         for symbol, date in product(symbols, self.get_trade_days(start, end)):
             self.index.create(symbol, date)
+        self.writer.create(symbols)
         self.check()
 
     def update(self, symbols=None, start=None, end=None):
@@ -207,13 +228,23 @@ def vt_symbol(symbol):
     return symbol.replace(".", ":")
 
 
+def dt2date(dt):
+    return dt.strftime("%Y%m%d")
+
+
+def dt2time(dt):
+    return dt.strftime("%H:%M:%S")
+
+
 BAR_COLUMN = ["vtSymbol", "symbol", "exchange", "open", "high", "low", "close", "date", "time", "datetime", "volume", "openInterest"]
+
 
 def vnpy_format(data, symbol):
     assert isinstance(data, pd.DataFrame)
     data["datetime"] = list(map(make_time, data["date"], data['time']))
     data["datetime"] = data["datetime"] - timedelta(minutes=1)
-    data["date"] = data["date"].apply(str)
+    data["date"] = data["datetime"].apply(dt2date)    
+    data["time"] = data["datetime"].apply(dt2time)    
     data["vtSymbol"] = vt_symbol(symbol)
     data["symbol"], data["exchange"] = symbol.split(".")
     data["openInterest"] = data["oi"].fillna(0)
@@ -319,6 +350,13 @@ class MongoDBWriter(Writer):
     def count(self, symbol, date):
         col = self.get_collection(symbol)
         return col.find({"date": str(date)}).count()
+    
+    def last(self, symbol):
+        doc = self.get_collection(symbol).find_one(sort=[("datetime", -1)])
+        if doc:
+            return int(doc["date"])
+        else:
+            return None
             
 
 def split(num, d=100, left=3):
@@ -347,25 +385,59 @@ def test_index():
         print(symbol, date)
 
 
-def test_api():
-    data = pd.read_csv("calendar.csv")
-    print(data)
+def latest(symbol, length, writer, framework):
+    assert isinstance(writer, Writer)
+    assert isinstance(framework, FrameWork)
+    start = writer.last(symbol)
+    end = get_today()
+    dates = framework.get_trade_days(start, end).iloc[:-1].values
+    tables = list(reversed(list(iter_bars(symbol, dates, length, framework))))
+    data = pd.concat(tables, ignore_index=True)
+    count = writer.write(symbol, data)
+    logging.warning("refresh data | %s | %s", symbol, count)
+    
+
+def iter_bars(symbol, dates, length, fw):
+    count = 0
+    data = fw.get_m1_daily(symbol, 0)
+    data = data[data["volume"]>0]
+    count += len(data)
+    if count > 0:
+        yield data
+        logging.warning("get bars | %s | %s", symbol, 0)
+    for date in reversed(dates):
+        if count >= length:
+            return
+        data = fw.get_m1_daily(symbol, date)
+        count += len(data)
+        if len(data) > 0:
+            yield data
+        logging.warning("get bars | %s | %s", symbol, date)
 
 
 def command(filename="conf.yml", commands=None):
-    load(filename, CONF)
+    init(filename)
+    histroy = CONF["history"]
     fw = get_framework()
     if not commands:
         commands = ["create", "publish"]
     
     for cmd in commands:
         if cmd == "update":
-            fw.update(start=CONF["data"]["start"], end=CONF["data"]["end"])
+            fw.update(start=histroy["start"], end=histroy["end"])
         elif cmd == "publish":
             fw.publish()
         elif cmd == "create":
-            fw.create(start=CONF["data"]["start"], end=CONF["data"]["end"])
-        
+            fw.create(start=histroy["start"], end=histroy["end"])
+        elif cmd == "latest":
+            LATEST = CONF["latest"]
+            symbols = LATEST["symbols"]
+            writer = get_mongodb_latest()
+            writer.create(symbols)
+            for symbol in symbols:
+                latest(symbol, LATEST["length"], writer, fw)
+
+            
 
 def main():
     import sys

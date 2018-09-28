@@ -108,7 +108,7 @@ def dt2int(dt):
 
 # 时间类型转换
 def dt2time(t):
-    return t.strftime("%H:%M:%S.%f")
+    return t.strftime("%H:%M:%S")
 
 # 时间类型转换
 def dt2date(t):
