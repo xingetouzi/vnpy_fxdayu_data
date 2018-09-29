@@ -12,6 +12,7 @@ import os
 
 
 FILENAME = os.environ.get("JQM1", os.path.join(os.path.dirname(__file__), "conf.yml"))
+CALENDAR = os.path.join(os.path.dirname(__file__), "calendar.csv")
 
 
 def get_today():
@@ -36,7 +37,6 @@ CONF = {
         "end": get_today(),
         "symbols": []
     },
-    "calendar": "calendar.csv"
 }
 
 
@@ -71,7 +71,7 @@ def get_framework():
     history = CONF["history"]
     api = get_api()
     index, writer = get_mongodb_storage()
-    return FrameWork(api, index, writer, history["symbols"], CONF["calendar"])
+    return FrameWork(api, index, writer, history["symbols"], CALENDAR)
 
 
 class JQIndex(object):
