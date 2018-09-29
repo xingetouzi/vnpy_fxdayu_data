@@ -4,7 +4,7 @@
 cd $PWD
 
 # conda 虚拟环境
-source activate vnpy
+# source activate vnpy
 
 export PYTHONPATH=$PWD
 
