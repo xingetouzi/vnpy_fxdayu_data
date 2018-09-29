@@ -1,7 +1,7 @@
 #! /bin/bash
 
-# 切换到当前目录
-cd /Users/caiming/Desktop/vnpy_fxdayu_data
+# 切换到目标目录
+cd $PWD
 
 # conda 虚拟环境
 source activate vnpy
