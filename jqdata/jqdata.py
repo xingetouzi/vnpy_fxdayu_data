@@ -11,6 +11,9 @@ from utils.conf import load
 import os
 
 
+FILENAME = os.environ.get("JQM1", os.path.join(os.path.dirname(__file__), "conf.yml"))
+
+
 def get_today():
     t = datetime.now()
     return t.year*10000 + t.month*100 + t.day
@@ -37,7 +40,7 @@ CONF = {
 }
 
 
-def init(filename="conf.yml"):
+def init(filename=FILENAME):
     load(filename, CONF)
 
 
@@ -415,7 +418,7 @@ def iter_bars(symbol, dates, length, fw):
         logging.warning("get bars | %s | %s", symbol, date)
 
 
-def command(filename="conf.yml", commands=None):
+def command(filename=FILENAME, commands=None):
     init(filename)
     histroy = CONF["history"]
     fw = get_framework()

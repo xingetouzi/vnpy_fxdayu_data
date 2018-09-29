@@ -1,5 +1,5 @@
 oanda:
-  token: ""
+  token: "aca515d198721260bc281073afbff674-843ea241ce00dc7d301fc32f31bff2d7"
   trade_type: PRACTICE
 mongodb:
   host: "localhost:27017"

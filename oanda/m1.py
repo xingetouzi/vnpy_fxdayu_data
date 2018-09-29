@@ -7,7 +7,10 @@ from itertools import product
 from utils.conf import load
 import logging
 import json
+import os
 
+
+FILENAME = os.environ.get("OANDA", os.path.join(os.path.dirname(__file__), "conf.yml"))
 
 EXCHANGE = "oanda"
 
@@ -342,7 +345,7 @@ conf = {
 }
 
 
-def command(filename="conf.yml", commands=None):
+def command(filename=FILENAME, commands=None):
     load(filename, conf)
     api = API(**conf.get("oanda", {}))
     target = conf["target"]

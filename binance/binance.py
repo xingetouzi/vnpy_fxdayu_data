@@ -11,6 +11,10 @@ from utils.mongodb import append, read, insert
 from itertools import product
 from utils.conf import load
 import logging
+import os
+
+
+FILENAME = os.environ.get("BINANCE", os.path.join(os.path.dirname(__file__), "conf.yml"))
 
 
 URL = "https://api.binance.com/api/v1/klines"
@@ -39,7 +43,7 @@ CONF = {
 
 
 
-def init(filename="conf.yml"):
+def init(filename=FILENAME):
     load(filename, CONF)
     if "proxies" in CONF:
         req_args["proxies"] = CONF["proxies"]
@@ -131,6 +135,7 @@ def create_index(collection, symbols, start, end):
     index = create_index_frame(symbols, start, end)
     if len(index.index):
         r = append(collection, index)
+        logging.warning("create index | %s | %s | %s | %s", symbols, start, end, r)
 
 # 创建获取数据索(DataFrame)
 def create_index_frame(symbols, start, end):
@@ -294,7 +299,7 @@ def _insert(collection, frame):
     return count
 
 
-def history(filename="conf.yml", commands=None):
+def history(filename=FILENAME, commands=None):
     init(filename)
     target = CONF["target"]
     storage = MongoDBStorage(**CONF["mongodb"])
