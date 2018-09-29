@@ -281,7 +281,7 @@ class MongodbJQIndex(JQIndex):
         try:
             self.collection.insert_one(doc)
         except DuplicateKeyError:
-            logging.warning("create index | %s | %s | duplicated", symbol, date)
+            logging.debug("create index | %s | %s | duplicated", symbol, date)
         else:
             logging.debug("create index | %s | %s | ok", symbol, date)
 

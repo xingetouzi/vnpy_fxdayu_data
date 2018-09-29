@@ -234,6 +234,7 @@ class MongoDBStorage(object):
         for symbol, start, end, in docs:
             if end > now:
                 logging.warning("handle require | %s | %s | %s | end > now(%s)", symbol, start, end, now)
+                count += 1
                 continue
             i, c = self.handle(symbol, start, end)
             if i:

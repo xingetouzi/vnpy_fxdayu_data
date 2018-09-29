@@ -1,5 +1,10 @@
 @echo off
 
+REM conda 虚拟环境
+REM call activate vnpy
+
+set PYTHONPATH=%cd%
+
 REM 创建biance数据索引
 echo create binance index
 python binance/binance.py create
@@ -23,3 +28,5 @@ python oanda/m1.py create
 REM 更新oanda数据
 echo update oanda data
 python oanda/m1.py update publish
+
+pause

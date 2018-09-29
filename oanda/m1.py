@@ -243,7 +243,6 @@ class Framework(object):
             logging.debug("create log | %s | %s | %s", instrument, date, r)
             return 1
         else:
-            logging.warning("create log | %s | %s | duplicated", instrument, date)
             return 0
 
     def create(self, instruments, start, end):
