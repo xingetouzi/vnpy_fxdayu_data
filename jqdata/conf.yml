@@ -1,18 +1,13 @@
-# jaqs登录配置
 login:
   addr: tcp://data.quantos.org:8910
   username: "18566262672"
   password: "eyJhbGciOiJIUzI1NiJ9.eyJjcmVhdGVfdGltZSI6IjE1MTI3MDI3NTAyMTIiLCJpc3MiOiJhdXRoMCIsImlkIjoiMTg1NjYyNjI2NzIifQ.O_-yR0zYagrLRvPbggnru1Rapk4kiyAzcwYt2a3vlpM"
-# 数据库配置
 mongodb:
   host: localhost:27017
   db: VnTrader_1Min_Db
   latest: VnTrader_1Min_Db_latest
-# 下载历史数据
 history:
-# 开始时间
   start: 20171001
-# 要下载的数据的品种
   symbols: 
     - AP.CZC
     - j.DCE
