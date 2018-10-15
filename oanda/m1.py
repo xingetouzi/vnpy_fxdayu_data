@@ -12,7 +12,7 @@ import os
 
 FILENAME = os.environ.get("OANDA", os.path.join(os.path.dirname(__file__), "conf.yml"))
 
-EXCHANGE = "oanda"
+EXCHANGE = "OANDA"
 
 
 def get_dt(date, tz=None):

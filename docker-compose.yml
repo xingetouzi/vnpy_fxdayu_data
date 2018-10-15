@@ -1,0 +1,27 @@
+version: '3'
+services:
+  vndata1m:
+    build: .
+    image: vndata1m
+  oanda:
+    container_name: "oanda_m1"
+    image: "vndata1m"
+    privileged: true
+    command: bash service.sh oanda/m1.py 08:30 09:00
+    volumes:
+      - ./oanda/conf.yml:/app/oanda/conf.yml
+  jaqs:
+    container_name: "jaqs_m1"
+    image: vndata1m
+    privileged: true
+    command: bash service.sh jqdata/jqdata.py 18:00 19:00
+    volumes:
+      - ./jqdata/conf.yml:/app/jqdata/conf.yml
+  binance:
+    container_name: "binance_m1"
+    image: vndata1m
+    privileged: true
+    command: bash service.sh binance/binance/py 04:00 05:00
+    volumes:
+      - ./binance/conf.yml:/app/binance/conf.yml
+      
