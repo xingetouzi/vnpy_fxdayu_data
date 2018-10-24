@@ -8,6 +8,7 @@ services:
     image: "vndata1m"
     privileged: true
     command: bash service.sh oanda/m1.py 08:30 09:00
+    restart: unless-stopped
     volumes:
       - ./oanda/conf.yml:/app/oanda/conf.yml
   jaqs:
@@ -15,6 +16,7 @@ services:
     image: vndata1m
     privileged: true
     command: bash service.sh jqdata/jqdata.py 18:00 19:00
+    restart: unless-stopped
     volumes:
       - ./jqdata/conf.yml:/app/jqdata/conf.yml
   binance:
@@ -22,6 +24,7 @@ services:
     image: vndata1m
     privileged: true
     command: bash service.sh binance/binance.py 04:00 05:00
+    restart: unless-stopped
     volumes:
       - ./binance/conf.yml:/app/binance/conf.yml
   okex:
@@ -29,5 +32,6 @@ services:
     image: vndata1m
     privileged: true
     command: bash service.sh okex/okex.py 00:00 02:00 04:00 06:00 08:00 10:00 12:00 14:00 16:00 18:00 20:00 22:00
+    restart: unless-stopped
     volumes:
       - ./okex/conf.yml:/app/okex/conf.yml
