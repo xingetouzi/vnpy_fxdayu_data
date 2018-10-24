@@ -1,5 +1,5 @@
 mongodb:
-  host: 192.168.0.105:37017
+  host: localhost
   log: log.okex_v1
   db: VnTrader_1Min_Db
 target:
@@ -28,5 +28,5 @@ target:
     - eos_usdt
     - eth_usdt
 proxies:
-  http: socks5://192.168.0.105:1080
-  https: socks5://192.168.0.105:1080
+  http: socks5://127.0.0.1:1080
+  https: socks5://127.0.0.1:1080
