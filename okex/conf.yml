@@ -1,0 +1,32 @@
+mongodb:
+  host: 192.168.0.105:37017
+  log: log.okex_v1
+  db: VnTrader_1Min_Db
+target:
+  futures:
+    - etc_next_week
+    - ltc_quarter
+    - etc_this_week
+    - eth_this_week
+    - bch_quarter
+    - eth_next_week
+    - ltc_next_week
+    - eos_next_week
+    - eth_quarter
+    - bch_this_week
+    - eos_this_week
+    - btc_next_week
+    - etc_quarter
+    - ltc_this_week
+    - bch_next_week
+    - btc_quarter
+    - eos_quarter
+    - btc_this_week
+    - eos_quarter_week
+  spots:
+    - btc_usdt
+    - eos_usdt
+    - eth_usdt
+proxies:
+  http: socks5://192.168.0.105:1080
+  https: socks5://192.168.0.105:1080

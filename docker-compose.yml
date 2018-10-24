@@ -21,7 +21,14 @@ services:
     container_name: "binance_m1"
     image: vndata1m
     privileged: true
-    command: bash service.sh binance/binance/py 04:00 05:00
+    command: bash service.sh binance/binance.py 04:00 05:00
     volumes:
       - ./binance/conf.yml:/app/binance/conf.yml
-      
+  okex:
+    container_name: "okex_m1"
+    image:
+      vndata1m
+    privileged: true
+    command: bash service.sh okex/okex.py 00:00 02:00 04:00 06:00 08:00 10:00 12:00 14:00 16:00 18:00 20:00 22:00
+      volumes:
+      - ./okex/conf.yml:/app/okex/conf.yml
