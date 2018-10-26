@@ -3,3 +3,4 @@ pymongo
 jaqs
 requests==2.11.1
 PyYAML==3.12
+pysocks
