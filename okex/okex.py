@@ -118,7 +118,8 @@ def vnpy_format(frame, symbol):
     frame["symbol"] = symbol
     frame["vtSymbol"] = vt_symbol(symbol)
     frame["openInterest"] = 0
-    frame["volume"] = frame["volume"].apply(float)
+    for name in ["open", "high", "low", "close", "volume"]:
+        frame[name] = frame[name].apply(float)
 
 
 def vnpy_future_1min(symbol, start=None):
