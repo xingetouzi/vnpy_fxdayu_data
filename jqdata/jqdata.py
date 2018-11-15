@@ -7,12 +7,16 @@ import pandas as pd
 import logging
 import traceback
 from itertools import product
-from utils.conf import load
+from utils import conf
 import os
 
 
 FILENAME = os.environ.get("JQM1", os.path.join(os.path.dirname(__file__), "conf.yml"))
 CALENDAR = os.path.join(os.path.dirname(__file__), "calendar.csv")
+MARKET = os.path.join(os.path.dirname(__file__), "market.csv")
+INSTMAP = os.path.join(os.path.dirname(__file__), "instmap.csv")
+TRADETIMES = {}
+MARKETMAP = {}
 
 
 def get_today():
@@ -41,7 +45,7 @@ CONF = {
 
 
 def init(filename=FILENAME):
-    load(filename, CONF)
+    conf.load(filename, CONF)
 
 
 def get_api():
@@ -116,7 +120,7 @@ def join(item):
 
 class FrameWork(object):
 
-    def __init__(self, api, index, writer, symbols, calendar=None):
+    def __init__(self, api, index, writer, symbols, calendar=None, market=None):
         assert isinstance(api, DataApi)
         assert isinstance(index, JQIndex)
         assert isinstance(writer, Writer)
@@ -153,7 +157,12 @@ class FrameWork(object):
     def get_m1_daily(self, symbol, date):
         data, msg = self.api.bar(symbol, trade_date=date)
         if msg == "0,":
-            return vnpy_format(data, symbol)
+            data = vnpy_format(data, symbol)
+            tp = get_tp(symbol)
+            if tp:
+                bools = list(map(tp, data["datetime"]))
+                data = data[bools]
+            return data
         else:
             raise ValueError(msg)
     
@@ -418,13 +427,109 @@ def iter_bars(symbol, dates, length, fw):
         logging.warning("get bars | %s | %s", symbol, date)
 
 
+class TimePeriod:
+
+    def __init__(self, *ranges):
+        self.ranges = ranges
+    
+    def __call__(self, time):
+        t = time.hour*100 + time.minute
+        for begin, end in self.ranges:
+            if (t >= begin) and (t < end):
+                return True
+        return False
+
+
+def read_tradetimes(market_file, instmap_file):
+
+    market = pd.read_csv(market_file)
+    instmap = pd.read_csv(instmap_file, index_col="symbol")["market"].to_dict()
+    MARKETMAP.update(instmap)
+    for doc in market.to_dict("record"):
+        ranges = []
+        for i in [1, 2, 3, 4]:
+            begin, end = doc["auctbeg%d" % i], doc["auctend%d" % i]
+            if begin != end:
+                if begin < end:
+                    ranges.append([begin, end])
+                else:
+                    ranges.append([begin, 2400])
+                    ranges.append([0, end])
+        TRADETIMES[doc["marketcode"]] = TimePeriod(*ranges)
+
+
+def get_tp(symbol):
+    mk = MARKETMAP.get(symbol, None)
+    if not mk:
+        mk = symbol.split(".")[-1]
+    return TRADETIMES.get(mk, None)
+
+
+def print_range():
+    command(commands=[2])
+    api = get_api()
+    symbols = ['CF.CZC', 'FG.CZC', 'JR.CZC', 'LR.CZC', 'MA.CZC', 'OI.CZC', 'PM.CZC', 'RI.CZC', 'RM.CZC', 'RS.CZC', 'SF.CZC', 'SM.CZC', 'SR.CZC', 'TA.CZC', 'ZC.CZC', 'WH.CZC', 'ME.CZC', 'ER.CZC', 'RO.CZC', 'TC.CZC', 'WS.CZC', 'WT.CZC', 'CY.CZC', 'AP.CZC', 'c.DCE', 'cs.DCE', 'a.DCE', 'b.DCE', 'm.DCE', 'y.DCE', 'p.DCE', 'bb.DCE', 'fb.DCE', 'i.DCE', 'j.DCE', 'jd.DCE', 'jm.DCE', 'l.DCE', 'pp.DCE', 'v.DCE', 'ni.SHF', 'cu.SHF', 'al.SHF', 'zn.SHF', 'pb.SHF', 'sn.SHF', 'au.SHF', 'ag.SHF', 'bu.SHF', 'fu.SHF', 'hc.SHF', 'rb.SHF', 'ru.SHF', 'wr.SHF', 'sc.INE']
+    result = {}
+    for symbol in symbols:
+        try:
+            r = query_for_range(api, symbol, 20181113)
+        except:
+            print(symbol)
+        else:
+            name = ",".join(["%d-%d" % tuple(item) for item in r])
+            result.setdefault(name, []).append(symbol)
+            print(name, symbol)
+    for key, value in result.items():
+        print(key, value)
+        
+
+def query_for_range(api, symbol, trade_date):
+    ranges = []
+    data, msg = api.bar(symbol, trade_date=trade_date)
+    data["datetime"] = list(map(make_time, data.date, data.time)) 
+    data["datetime"] -= timedelta(minutes=1)
+    index = data[data.datetime - data.datetime.shift(1) > timedelta(minutes=1)].index
+    begin = data.index[0]
+    for end in index:
+        ranges.append([
+            time2int(data.datetime[begin]), 
+            time2int(data.datetime[end-1] + timedelta(minutes=1))
+        ])
+        begin = end
+    end = data.index[-1]
+    ranges.append([
+        time2int(data.datetime[begin]), 
+        time2int(data.datetime[end] + timedelta(minutes=1))
+    ])
+    return ranges
+
+
+def time2int(t):
+    return int(t.hour*100 + t.minute)
+
+
+def create_instmap():
+    mapper = {
+        "SHF0100": ['ni.SHF', 'cu.SHF', 'al.SHF', 'zn.SHF', 'pb.SHF', 'sn.SHF'],
+        "SHF2300": ['bu.SHF', 'fu.SHF', 'hc.SHF', 'rb.SHF', 'ru.SHF'],
+        "CZC1500": ['JR.CZC', 'LR.CZC', 'PM.CZC', 'RI.CZC', 'RS.CZC', 'SF.CZC', 'SM.CZC', 'WH.CZC', 'AP.CZC'],
+        "DCE1500": ['c.DCE', 'cs.DCE', 'bb.DCE', 'fb.DCE', 'jd.DCE', 'l.DCE', 'pp.DCE', 'v.DCE', 'wr.SHF'],
+        "SHF1500": ['wr.SHF']
+    }
+    doc = {}
+    for key, value in mapper.items():
+        doc.update(dict.fromkeys(value, key))
+    
+    print(pd.Series(doc, name="market").rename_axis("symbol").sort_values().reset_index().to_csv("instmap.csv", index=False))
+
+
 def command(filename=FILENAME, commands=None):
     init(filename)
+    read_tradetimes(MARKET, INSTMAP)
     histroy = CONF["history"]
     fw = get_framework()
     if not commands:
         commands = ["create", "publish"]
-    
     for cmd in commands:
         if cmd == "update":
             fw.update(start=histroy["start"], end=histroy["end"])
@@ -440,7 +545,6 @@ def command(filename=FILENAME, commands=None):
             for symbol in symbols:
                 latest(symbol, LATEST["length"], writer, fw)
 
-            
 
 def main():
     import sys
