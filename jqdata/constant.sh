@@ -1,6 +1,6 @@
 #! /bin/bash
 
-JQM1=conf-constant.yml
+export JQM1=conf-constant.yml
 
 python constant.py create find
 python jqdata.py publish      
