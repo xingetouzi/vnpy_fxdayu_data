@@ -1,0 +1,14 @@
+login:
+  addr: tcp://data.quantos.org:8910
+  username: "18566262672"
+  password: "eyJhbGciOiJIUzI1NiJ9.eyJjcmVhdGVfdGltZSI6IjE1MTI3MDI3NTAyMTIiLCJpc3MiOiJhdXRoMCIsImlkIjoiMTg1NjYyNjI2NzIifQ.O_-yR0zYagrLRvPbggnru1Rapk4kiyAzcwYt2a3vlpM"
+mongodb:
+  host: 192.168.0.104,192.168.0.105
+  db: VnTrader_1Min_Db
+  latest: VnTrader_1Min_Db_latest
+  log: "log.jqm1_constant"
+history:
+  start: 20100101
+  symbols: ["IF.CFE", "IC.CFE", "IH.CFE"]
+
+  

@@ -4,6 +4,7 @@ from pymongo.database import Database, Collection
 from pymongo.errors import DuplicateKeyError
 from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
 import logging
 import traceback
 from itertools import product
@@ -34,7 +35,8 @@ CONF = {
         "host": "localhost:27017",
         "db": "VnTrader_1Min_Db",
         "log": "log.jqm1",
-        "latest": "VnTrader_1Min_Db_latest"
+        "latest": "VnTrader_1Min_Db_latest",
+        "mapper": "log.contract_mapper"
     },
     "history": {
         "start": 20180101,
@@ -91,6 +93,7 @@ class JQIndex(object):
     
     def latest(self, symbol):
         pass
+    
 
 
 class Writer(object):
@@ -106,7 +109,7 @@ class Writer(object):
     
     def last(self, symbol):
         pass
-
+    
 
 def not_empty(item):
     if item[1]:
@@ -138,8 +141,17 @@ class FrameWork(object):
         else:
             raise ValueError(msg)
 
-    def get_trade_days(self, start=None, end=None):
-        return self.calendar.loc[start:end]
+    def get_trade_days(self, start=None, end=None, start_shift=0, end_shift=0):
+        # return self.calendar.loc[start:end]
+        if start:
+            start = self.calendar.searchsorted(start)
+            if start_shift:
+                start += start_shift
+        if end:
+            end = self.calendar.searchsorted(end, "right")
+            if end_shift:
+                end += end_shift
+        return self.calendar[start:end]
     
     def create_calendar(self, calendar):
         if isinstance(calendar, str) and os.path.isfile(calendar):
@@ -148,7 +160,8 @@ class FrameWork(object):
             data = calendar
         else:
             data = self.query_trade_days()
-        return pd.Series(data.values, data.values).sort_index()
+        # return pd.Series(data.values, data.values).sort_index()
+        return data.values
 
     def query_trade_days(self):
         dates = self.query("jz.secTradeCal")
@@ -307,14 +320,14 @@ class MongodbJQIndex(JQIndex):
         if end:
             ft.setdefault(self.DATE, {})["$lte"] = end
         if count is not None:
-            ft[self.COUNT] = count
+            ft[self.COUNT] = count 
         if insert is not None:
             ft[self.INSERT] = insert
         
         cursor = self.collection.find(ft, [self.SYMBOL, self.DATE])
         for doc in list(cursor):
             yield doc[self.SYMBOL], doc[self.DATE]
-        
+
     def fill(self, symbol, date, count, insert):
         ft = {self.SYMBOL: symbol, self.DATE: date}
         upd = {self.COUNT: count, self.INSERT: insert, self.MODIFY: datetime.now()}
@@ -369,7 +382,14 @@ class MongoDBWriter(Writer):
             return int(doc["date"])
         else:
             return None
-            
+    
+    def read(self, symbol, start, end):
+        col = self.get_collection(symbol)
+        filters = {
+            "datetime": {"$gte": start, "$lte": end}
+        }
+        return pd.DataFrame(list(col.find(filters, projection={"_id": 0})))
+    
 
 def split(num, d=100, left=3):
     while num >= d and (left > 1):
@@ -402,7 +422,7 @@ def latest(symbol, length, writer, framework):
     assert isinstance(framework, FrameWork)
     start = writer.last(symbol)
     end = get_today()
-    dates = framework.get_trade_days(start, end).iloc[:-1].values
+    dates = framework.get_trade_days(start, end).iloc[:-1]
     tables = list(reversed(list(iter_bars(symbol, dates, length, framework))))
     data = pd.concat(tables, ignore_index=True)
     count = writer.write(symbol, data)
@@ -524,6 +544,7 @@ def create_instmap():
 
 
 def command(filename=FILENAME, commands=None):
+    print(filename)
     init(filename)
     read_tradetimes(MARKET, INSTMAP)
     histroy = CONF["history"]
@@ -536,7 +557,7 @@ def command(filename=FILENAME, commands=None):
         elif cmd == "publish":
             fw.publish()
         elif cmd == "create":
-            fw.create(start=histroy["start"], end=histroy["end"])
+            fw.create(histroy["symbols"], start=histroy["start"], end=histroy["end"])
         elif cmd == "latest":
             LATEST = CONF["latest"]
             symbols = LATEST["symbols"]
@@ -546,9 +567,18 @@ def command(filename=FILENAME, commands=None):
                 latest(symbol, LATEST["length"], writer, fw)
 
 
+
+def select(data, start=0, end=99999999):
+    assert isinstance(data, pd.DataFrame)
+    b1 = data["delist_date"].apply(int) >= start
+    b2 = data["list_date"].apply(int) <= end
+    return data[b1 & b2]
+
+
 def main():
     import sys
     command(commands=sys.argv[1:])
+
 
 
 if __name__ == '__main__':
