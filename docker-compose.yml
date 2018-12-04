@@ -19,6 +19,14 @@ services:
     restart: unless-stopped
     volumes:
       - ./jqdata/conf.yml:/app/jqdata/conf.yml
+  ctp_constant:
+    container_name: "ctp_m1_constant"
+    image: vndata1m
+    privileged: true
+    command: bash -c "cd jqdata ; source constant.sh 18:00 19:00"
+    restart: unless-stopped
+    volumes:
+      - ./jqdata/conf-constant.yml:/app/jqdata/conf-constant.yml
   binance:
     container_name: "binance_m1"
     image: vndata1m
